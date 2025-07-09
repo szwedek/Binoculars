@@ -63,7 +63,7 @@ class Binoculars:
                                dtype="float32"
                                )
 
-        self.pad_id = self.observer.token_eos() if hasattr(self.observer, 'token_eos') else 2
+        self.pad_id = self.observer.token_eos() if hasattr(self.observer, 'token_eos') else 2 # 11 if falcon
         self.control_token_ids = get_control_token_ids(self.observer)
         self.executor = ThreadPoolExecutor(max_workers=2)
 
