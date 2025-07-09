@@ -8,17 +8,6 @@ from .metrics import perplexity, entropy
 BINOCULARS_ACCURACY_THRESHOLD = 1.2
 BINOCULARS_FPR_THRESHOLD = 0.8536432310785527
 
-def softmax(x, axis=-1):
-    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
-    return e_x / np.sum(e_x, axis=axis, keepdims=True)
-
-def cross_entropy(probs, labels, mask=None):
-    logp = np.log(np.clip(probs, 1e-9, 1.0))
-    loss = -np.sum(labels * logp, axis=-1)
-    if mask is not None:
-        return np.sum(loss * mask, axis=1) / np.sum(mask, axis=1)
-    return np.mean(loss, axis=1)
-
 CONTROL_TOKENS = [
     '<|tool|>', '<|system|>', '<|user|>', '<|assistant|>', '<|im_start|>', '<|im_end|>'
 ]
