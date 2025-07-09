@@ -9,15 +9,19 @@ BINOCULARS_ACCURACY_THRESHOLD = 1.2
 BINOCULARS_FPR_THRESHOLD = 0.8536432310785527
 
 def softmax(x, axis=-1):
-    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
-    return e_x / np.sum(e_x, axis=axis, keepdims=True)
+    x = np.asarray(x, dtype=np.float32)
+    e_x = np.exp(x - np.max(x, axis=axis, keepdims=True)).astype(np.float32)
+    return (e_x / np.sum(e_x, axis=axis, keepdims=True)).astype(np.float32)
 
 def cross_entropy(probs, labels, mask=None):
-    logp = np.log(np.clip(probs, 1e-9, 1.0))
-    loss = -np.sum(labels * logp, axis=-1)
+    probs = np.asarray(probs, dtype=np.float32)
+    labels = np.asarray(labels, dtype=np.float32)
+    logp = np.log(np.clip(probs, 1e-9, 1.0)).astype(np.float32)
+    loss = -np.sum(labels * logp, axis=-1).astype(np.float32)
     if mask is not None:
-        return np.sum(loss * mask, axis=1) / np.sum(mask, axis=1)
-    return np.mean(loss, axis=1)
+        mask = np.asarray(mask, dtype=np.float32)
+        return (np.sum(loss * mask, axis=1) / np.sum(mask, axis=1)).astype(np.float32)
+    return np.mean(loss, axis=1).astype(np.float32)
 
 CONTROL_TOKENS = [
     '<|tool|>', '<|system|>', '<|user|>', '<|assistant|>', '<|im_start|>', '<|im_end|>'
@@ -93,21 +97,21 @@ class Binoculars:
         for seq in input_ids:
             model.reset()
             model.eval(seq.tolist())
-            logits = np.array(model.scores)
-            if logits.dtype != np.float32:
-                logits = logits.astype(np.float32)
+            logits = np.array(model.scores, dtype=np.float32)
             out.append(logits)
-        return np.stack(out)
+        return np.stack(out).astype(np.float32)
 
     def compute_encodings_score(self, enc_ids_mask: tuple[np.ndarray, np.ndarray]):
         input_ids, attention_mask = enc_ids_mask
         fut_o = self.executor.submit(self._get_logits, self.observer, input_ids)
         fut_p = self.executor.submit(self._get_logits, self.performer, input_ids)
-        obs_logits = fut_o.result()
-        perf_logits = fut_p.result()
+        obs_logits = fut_o.result().astype(np.float32)
+        perf_logits = fut_p.result().astype(np.float32)
         ppl = perplexity(input_ids, perf_logits, attention_mask, pad_token_id=self.pad_id, control_token_ids=self.control_token_ids)
         ent = entropy(obs_logits, perf_logits, input_ids, self.pad_id, attention_mask, control_token_ids=self.control_token_ids)
-        return ppl / ent
+        ppl = np.asarray(ppl, dtype=np.float32)
+        ent = np.asarray(ent, dtype=np.float32)
+        return (ppl / ent).astype(np.float32)
 
     def compute_score(self, input_text: Union[str, list[str]]):
         texts = [input_text] if isinstance(input_text, str) else input_text
