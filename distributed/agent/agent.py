@@ -9,6 +9,7 @@ from typing import Any
 
 load_dotenv()
 
+score_lock = asyncio.Lock()
 class BinocularsManager:
     def __init__(self):
         self.detector = None
@@ -70,13 +71,14 @@ app = FastAPI(lifespan=lifespan)
 
 @app.post("/score")
 async def score(payload: Any = Body(...)):
-    if isinstance(payload, dict) and "text" in payload:
-        text = payload["text"]
-    else:
-        text = payload
+    async with score_lock:
+        if isinstance(payload, dict) and "text" in payload:
+            text = payload["text"]
+        else:
+            text = payload
 
-    if not (isinstance(text, str) or (isinstance(text, list) and all(isinstance(x, str) for x in text))):
-        return {"error": "Input must be a string or a list of strings."}
-    detector = await bino_manager.load()
-    result = detector.compute_score(text)
-    return {"score": result}
+        if not (isinstance(text, str) or (isinstance(text, list) and all(isinstance(x, str) for x in text))):
+            return {"error": "Input must be a string or a list of strings."}
+        detector = await bino_manager.load()
+        result = detector.compute_score(text)
+        return {"score": result}
