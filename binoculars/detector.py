@@ -1,3 +1,4 @@
+import encodings
 from typing import Union
 from concurrent.futures import ThreadPoolExecutor
 import os
@@ -5,7 +6,7 @@ import numpy as np
 import torch
 import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from copy import copy
+from copy import deepcopy
 
 from .utils import assert_tokenizer_consistency
 from .metrics import perplexity, entropy
@@ -33,7 +34,6 @@ class Binoculars(object):
         use_bfloat16: bool = True,
         max_token_observed: int = 512,
         mode: str = "low-fpr",
-        compile: bool = False,
         check_tokenizer_consistency: bool = True,
     ) -> None:
         if check_tokenizer_consistency:
@@ -55,9 +55,7 @@ class Binoculars(object):
             torch_dtype=torch.bfloat16 if use_bfloat16 else torch.float32,
             token=huggingface_config["TOKEN"],
         ).eval()
-        if compile:
-            self.observer_model = torch.compile(self.observer_model)
-            self.performer_model = torch.compile(self.performer_model)
+
         self.tokenizer = AutoTokenizer.from_pretrained(observer_name_or_path)
         if not self.tokenizer.pad_token:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -93,9 +91,6 @@ class Binoculars(object):
     def _get_performer_logits(
         self, encodings_perf: transformers.BatchEncoding
     ) -> torch.Tensor:
-        """FIXME: ValueError: Pointer argument (at 0) cannot be accessed from Triton (cpu tensor?) when using gptqmodel and GPTQ quantized LLM.
-        This is because Triton is tied to cuda:0 for gptqmodel.
-        If we are willing to only use one GPU, it works."""
         return self.performer_model(**encodings_perf).logits
 
     def _get_logits(
@@ -113,23 +108,27 @@ class Binoculars(object):
     ) -> np.ndarray:
         obs_device = self.observer_model.device
         perf_device = self.performer_model.device
-        # NOTE: `BatchEncoding.to()` mutates `self`.
-        encodings_obs = copy(encodings).to(obs_device, non_blocking=True)
-        encodings_perf = copy(encodings).to(perf_device, non_blocking=True)
+
+        enc_obs  = deepcopy(encodings)
+        enc_perf = deepcopy(encodings)
+
+        enc_obs.to(obs_device, non_blocking=True)
+        enc_perf.to(perf_device, non_blocking=True)
+
         observer_logits, performer_logits = self._get_logits(
-            encodings_obs, encodings_perf
+            enc_obs, enc_perf
         )
-        ppl = perplexity(encodings_perf, performer_logits)
+        ppl = perplexity(enc_perf, performer_logits)
         x_ppl = entropy(
             observer_logits,
             performer_logits.to(obs_device),
-            encodings_obs,
+            enc_obs,
             self.tokenizer.pad_token_id,
         )
         binoculars_scores = ppl / x_ppl
         del (
-            encodings_obs,
-            encodings_perf,
+            enc_obs,
+            enc_perf,
             observer_logits,
             performer_logits,
             ppl,

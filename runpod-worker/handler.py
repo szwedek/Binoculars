@@ -28,7 +28,6 @@ INITIALIZATION_COMPLETE = False
 MODE = os.environ.get("BINOCULARS_MODE", "low-fpr")
 MAX_TOKENS = int(os.environ.get("MAX_TOKENS", 512))
 USE_BFLOAT16 = os.environ.get("USE_BFLOAT16", "true").lower() == "true"
-COMPILE = os.environ.get("COMPILE", "false").lower() == "true"
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 8))
 MAX_WAIT_TIME = float(os.environ.get("MAX_WAIT_TIME", 0.05))
 
@@ -198,8 +197,7 @@ def init_binoculars():
                 use_bfloat16=USE_BFLOAT16,
                 max_token_observed=MAX_TOKENS,
                 mode=MODE,
-                check_tokenizer_consistency=False,
-                compile=COMPILE,
+                check_tokenizer_consistency=False
             )
             
             logger.info("Binoculars models loaded successfully")
@@ -306,7 +304,6 @@ if __name__ == "__main__":
     logger.info(f"  - Max wait time: {MAX_WAIT_TIME}s")
     logger.info(f"  - GPU devices: {torch.cuda.device_count()}")
     logger.info(f"  - Use bfloat16: {USE_BFLOAT16}")
-    logger.info(f"  - Compile: {COMPILE}")
     logger.info(f"  - Mode: {MODE}")
     logger.info(f"  - Max tokens: {MAX_TOKENS}")
 
